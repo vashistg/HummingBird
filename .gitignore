@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Data — songs and indices are large binaries, not source
+data/songs/
+data/songs.db
+data/indices/
+data/test_hums/
+
+# OS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp

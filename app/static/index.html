@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HummingBird — Mini Shazam</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a22;
+    --border: #2a2a36;
+    --accent: #7c6aff;
+    --accent2: #ff6a9b;
+    --text: #e0e0f0;
+    --muted: #7070a0;
+    --green: #4ade80;
+    --yellow: #fbbf24;
+    --red: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; min-height: 100vh; }
+
+  header {
+    padding: 2rem 2rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 1rem;
+  }
+  header h1 { font-size: 1.6rem; letter-spacing: -0.5px; }
+  header span { color: var(--muted); font-size: 0.85rem; }
+  .pill {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 2px 10px; border-radius: 99px; font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  main { max-width: 960px; margin: 0 auto; padding: 2rem; }
+
+  .upload-card {
+    background: var(--surface); border: 2px dashed var(--border);
+    border-radius: 12px; padding: 2.5rem; text-align: center;
+    transition: border-color 0.2s;
+  }
+  .upload-card.dragover { border-color: var(--accent); }
+  .upload-card p { color: var(--muted); margin-bottom: 1.2rem; font-size: 0.9rem; }
+
+  .btn-row { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+  button {
+    background: var(--accent); color: #fff; border: none;
+    padding: 0.6rem 1.4rem; border-radius: 8px; cursor: pointer;
+    font-family: inherit; font-size: 0.9rem; transition: opacity 0.15s;
+  }
+  button:hover { opacity: 0.85; }
+  button.secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #fileInput { display: none; }
+  #filename { color: var(--muted); font-size: 0.8rem; margin-top: 0.8rem; min-height: 1.2em; }
+
+  /* Status bar */
+  .status-bar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.7rem 1.2rem; margin: 1.5rem 0; display: flex; gap: 2rem;
+    font-size: 0.8rem; align-items: center;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+  .dot.green { background: var(--green); }
+  .dot.red { background: var(--red); }
+  .dot.yellow { background: var(--yellow); }
+
+  /* Results */
+  #results { margin-top: 2rem; }
+  .results-header { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1rem; }
+
+  /* Timing comparison table */
+  .timing-table {
+    width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 2rem;
+    background: var(--surface); border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .timing-table th {
+    background: #12121a; color: var(--muted); font-weight: normal;
+    padding: 0.7rem 1rem; text-align: left; border-bottom: 1px solid var(--border);
+  }
+  .timing-table td { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); }
+  .timing-table tr:last-child td { border-bottom: none; }
+  .timing-table tr:hover td { background: #20202c; }
+  .badge {
+    display: inline-block; padding: 1px 8px; border-radius: 99px;
+    font-size: 0.72rem;
+  }
+  .badge.exact { background: #1a3a1a; color: var(--green); border: 1px solid #2a4a2a; }
+  .badge.approx    { background: #1a1a3a; color: var(--accent); border: 1px solid #2a2a5a; }
+  .badge.sequence  { background: #2a1a3a; color: #a070ff; border: 1px solid #4a2a6a; }
+  .bar-cell { width: 180px; }
+  .bar-bg { background: var(--border); border-radius: 3px; height: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.4s; }
+
+  /* Match cards */
+  .method-block { margin-bottom: 2rem; }
+  .method-title {
+    font-size: 0.75rem; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 0.6rem;
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .match-list { display: flex; flex-direction: column; gap: 0.4rem; }
+  .match-row {
+    display: flex; align-items: center; gap: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.65rem 1rem;
+    transition: border-color 0.15s;
+  }
+  .match-row:first-child { border-color: var(--accent); }
+  .rank { color: var(--muted); font-size: 0.8rem; width: 1.5rem; }
+  .song-info { flex: 1; }
+  .song-title { font-size: 0.9rem; }
+  .song-artist { font-size: 0.75rem; color: var(--muted); }
+  .score-val { font-size: 0.8rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+  /* Explainer */
+  details { margin-top: 2.5rem; border: 1px solid var(--border); border-radius: 10px; }
+  summary {
+    padding: 1rem 1.2rem; cursor: pointer; font-size: 0.9rem;
+    user-select: none; list-style: none; display: flex; align-items: center; gap: 0.5rem;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: '▶'; font-size: 0.7rem; color: var(--accent); transition: transform 0.2s; }
+  details[open] summary::before { transform: rotate(90deg); }
+  .explainer { padding: 1.2rem 1.4rem; border-top: 1px solid var(--border); font-size: 0.85rem; line-height: 1.8; }
+  .explainer h3 { color: var(--accent); margin: 1.2rem 0 0.4rem; font-size: 0.85rem; }
+  .explainer p { color: var(--muted); margin-bottom: 0.6rem; }
+  .code-block {
+    background: #12121a; border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.8rem 1rem; margin: 0.6rem 0; color: #a0d8ef;
+    font-size: 0.8rem; overflow-x: auto; white-space: pre;
+  }
+  .highlight { color: var(--accent2); }
+
+  /* Song list */
+  .song-list-section { margin-top: 2rem; }
+  .song-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.6rem; margin-top: 0.8rem;
+  }
+  .song-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.6rem 0.9rem; font-size: 0.8rem;
+  }
+  .song-card .t { color: var(--text); }
+  .song-card .a { color: var(--muted); font-size: 0.72rem; }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-box {
+    background: #2a1515; border: 1px solid #5a2a2a; border-radius: 8px;
+    padding: 1rem; color: var(--red); font-size: 0.85rem;
+  }
+
+  /* Feedback */
+  .feedback-box {
+    margin-top: 1.2rem; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.2rem; font-size: 0.85rem;
+  }
+  .feedback-box .fb-q { color: var(--muted); margin-bottom: 0.7rem; }
+  .fb-btns { display: flex; gap: 0.6rem; }
+  .fb-btn {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 0.3rem 1rem; font-family: inherit; font-size: 0.82rem;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .fb-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .fb-btn.yes:hover { border-color: var(--green); color: var(--green); }
+  .fb-form {
+    margin-top: 0.9rem; display: flex; flex-direction: column; gap: 0.7rem;
+  }
+  .fb-form label { color: var(--muted); font-size: 0.8rem; }
+  .fb-input {
+    background: #12121a; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 0.45rem 0.8rem; font-family: inherit; font-size: 0.85rem;
+    width: 100%; box-sizing: border-box;
+  }
+  .fb-input:focus { outline: none; border-color: var(--accent); }
+  .fb-submit {
+    align-self: flex-start; background: var(--accent); border: none; border-radius: 6px;
+    color: #fff; padding: 0.4rem 1.1rem; font-family: inherit; font-size: 0.82rem;
+    cursor: pointer; transition: opacity 0.15s;
+  }
+  .fb-submit:hover { opacity: 0.85; }
+  .fb-ok { color: var(--green); font-size: 0.82rem; margin-top: 0.5rem; }
+
+  /* Tabs */
+  .tab-nav {
+    display: flex; gap: 0.3rem; margin-left: auto;
+  }
+  .tab-btn {
+    background: transparent; border: 1px solid transparent;
+    color: var(--muted); padding: 0.35rem 1rem; border-radius: 6px;
+    font-family: inherit; font-size: 0.82rem; cursor: pointer; transition: all 0.15s;
+  }
+  .tab-btn:hover { color: var(--text); border-color: var(--border); }
+  .tab-btn.active { background: var(--surface); border-color: var(--border); color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Architecture diagram */
+  .arch-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 2rem; margin-top: 1.5rem; overflow-x: auto;
+  }
+  .arch-wrap .mermaid { min-width: 640px; }
+  .arch-legend {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.8rem; margin-top: 1.5rem;
+  }
+  .legend-card {
+    background: #12121a; border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.8rem 1rem; font-size: 0.8rem;
+  }
+  .legend-card .lc-title { color: var(--accent); margin-bottom: 0.3rem; font-size: 0.75rem; }
+  .legend-card .lc-body { color: var(--muted); line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>HummingBird</h1>
+    <span>Mini Shazam — ANN learning lab</span>
+  </div>
+  <nav class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('search')">Search</button>
+    <button class="tab-btn" onclick="switchTab('architecture')">Architecture</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- ══════════════════  TAB: SEARCH  ══════════════════ -->
+<div id="tab-search" class="tab-panel active">
+
+  <!-- Upload card -->
+  <div class="upload-card" id="dropZone">
+    <p>Upload a hum, a snippet, or any audio file. All five search methods race in parallel.</p>
+    <div class="btn-row">
+      <button onclick="document.getElementById('fileInput').click()">Choose file</button>
+      <button class="secondary" id="searchBtn" onclick="doSearch()" disabled>Find Song</button>
+    </div>
+    <input type="file" id="fileInput" accept="audio/*" onchange="onFileSelected(this)">
+    <div id="filename"></div>
+  </div>
+
+  <!-- Live status -->
+  <div class="status-bar" id="statusBar">
+    <span id="statusSongs"><span class="dot yellow"></span>loading…</span>
+    <span id="statusHnsw"><span class="dot yellow"></span>hnswlib</span>
+    <span id="statusFaiss"><span class="dot yellow"></span>FAISS</span>
+  </div>
+
+  <!-- Results area -->
+  <div id="results"></div>
+
+  <!-- Indexed songs -->
+  <div class="song-list-section">
+    <div class="results-header">Indexed library</div>
+    <div class="song-grid" id="songGrid"><em style="color:var(--muted);font-size:0.8rem">loading…</em></div>
+  </div>
+
+  <!-- Explainer -->
+  <details>
+    <summary>Why is cosine similarity O(n) — and how does ANN fix it?</summary>
+    <div class="explainer">
+
+      <h3>Step 1 — Audio → embedding (128 numbers)</h3>
+      <p>librosa extracts 128 MFCC coefficients, averaged over time. Each song becomes a single point in a 128-dimensional space.</p>
+      <div class="code-block">mfcc = librosa.feature.mfcc(y, sr, n_mfcc=128)   # shape (128, T)
+embedding = mean(mfcc, axis=time)               # shape (128,)  ← one point in ℝ¹²⁸</div>
+
+      <h3>Step 2 — Cosine similarity</h3>
+      <p>Two audio clips "sound similar" when their embedding vectors point in roughly the same direction. We measure this with the angle between them.</p>
+      <div class="code-block">cos_sim(a, b) = <span class="highlight">dot(a, b)</span> / (|a| × |b|)
+
+After L2-normalizing all vectors to unit length:
+cos_sim(a, b) = <span class="highlight">dot(a, b)</span>          ← just a dot product!</div>
+
+      <h3>Step 3 — Why brute-force is O(n)</h3>
+      <p>To find the best match, we compute the dot product between the query and <em>every song</em>. With n songs and 128 dimensions, that's <strong>n × 128</strong> multiplications.</p>
+      <div class="code-block">scores = E @ query    # E has shape (n, 128)
+                      # This is <span class="highlight">n dot products</span> — one per song
+                      # Scale a 10-song library to 10M songs → 10M × 128 ops</div>
+
+      <h3>Step 4 — hnswlib HNSW: graph traversal (reference impl)</h3>
+      <p>HNSW builds a layered graph — think of it like a highway system. The top layer connects only a few "hub" nodes far apart; lower layers are denser. A query starts at the top and greedily descends, zooming in on the answer.</p>
+      <div class="code-block">Build: connect each vector to M=16 nearest neighbors per layer
+Query: greedy walk from random entry → descend layers → ef=50 candidates
+Cost: O(log n) hops per layer — orders of magnitude faster than O(n)</div>
+
+      <h3>Step 5 — FAISS IVF: k-means partitioning</h3>
+      <p>IVF clusters all embeddings into Voronoi cells with k-means. At query time only nprobe nearest cells are searched — the rest are ignored entirely.</p>
+      <div class="code-block">n_lists = sqrt(n) Voronoi cells  (k-means clustering)
+nprobe  = n_lists / 4            (only 25% of cells searched)
+Cost: O(nprobe × n/n_lists)  ≈  O(sqrt(n))  for default settings</div>
+
+      <h3>Step 6 — FAISS HNSW vs hnswlib HNSW</h3>
+      <p>Both implement the same algorithm (Malkov &amp; Yashunin 2018). The difference is in the engine: hnswlib is the standalone reference implementation (~300 LOC C++ core, easy to read). FAISS HNSW adds SIMD-accelerated distance kernels and integrates with FAISS's quantization ecosystem — significantly faster at millions of vectors.</p>
+      <div class="code-block">hnswlib:    standalone, clean API, online insertions (add items after build)
+FAISS HNSW: same graph structure + AVX2/AVX-512 SIMD kernels + quantization
+Both:       M=connections per node, ef_construction=build quality, ef=query quality</div>
+
+      <h3>The catch: approximate</h3>
+      <p>IVF and HNSW can miss the true nearest neighbor. The timing table shows whether each method agreed with brute-force — that agreement rate is called <em>recall</em>. With only 12 songs every method should agree; the differences emerge at 1M+ vectors.</p>
+    </div>
+  </details>
+
+</div><!-- /tab-search -->
+
+
+<!-- ══════════════════  TAB: ARCHITECTURE  ══════════════════ -->
+<div id="tab-architecture" class="tab-panel">
+
+  <div class="arch-wrap">
+    <div class="results-header" style="margin-bottom:1.2rem">System Architecture</div>
+
+    <div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {
+  "background": "#0f0f13",
+  "primaryColor": "#1a1a22",
+  "primaryTextColor": "#e0e0f0",
+  "primaryBorderColor": "#7c6aff",
+  "lineColor": "#7c6aff",
+  "secondaryColor": "#12121a",
+  "tertiaryColor": "#12121a",
+  "clusterBkg": "#12121a",
+  "clusterBorder": "#2a2a36",
+  "edgeLabelBackground": "#1a1a22",
+  "fontFamily": "SF Mono, Fira Code, monospace"
+}}}%%
+flowchart TB
+
+  subgraph INGEST["📥  Ingest Pipeline  —  scripts/ingest.py  (run once offline)"]
+    direction LR
+    AF["🎵 Audio Files\ndata/songs/\n.wav  .mp3  .flac"] --> LIB1["librosa\nMFCC extractor\nn_mfcc = 128"]
+    LIB1 -->|"mean over time\nL2-normalise"| EMB["128-dim\nunit vector\nfloat32"]
+    EMB -->|"metadata +\nembedding blob"| DB[("SQLite\nsongs.db")]
+    EMB --> HB["hnswlib\nbuilder\nM=16  ef=200"]
+    EMB --> FB["FAISS\nbuilder"]
+    HB --> IF1["hnswlib.bin\nlayered graph"]
+    FB --> IF2["faiss_flat.index\nexact · SIMD"]
+    FB --> IF3["faiss_ivf.index\nVoronoi clusters"]
+    FB --> IF4["faiss_hnsw.index\nlayered graph"]
+  end
+
+  subgraph QUERY["🔍  Query Pipeline  —  app/main.py  (per request, real-time)"]
+    direction TB
+    BRW["🌐 Browser\nHTML + JS"] -->|"audio file upload\nmultipart/form-data"| EP["FastAPI\nPOST /search"]
+    EP --> LIB2["librosa\nMFCC extractor"]
+    LIB2 -->|"128-dim\nquery vector"| QV{" "}
+
+    QV --> BF["① Brute Force\nnumpy  E @ q\nO(n) — ground truth"]
+    QV --> HQ["② hnswlib HNSW\ngraph walk\nO(log n)"]
+    QV --> FFQ["③ FAISS Flat\nSIMD dot products\nO(n) optimised"]
+    QV --> IVQ["④ FAISS IVF\nprobe 25% clusters\nO(sqrt n)"]
+    QV --> FHQ["⑤ FAISS HNSW\ngraph walk\nO(log n)"]
+
+    DB -->|"load all\nembeddings"| BF
+    IF1 --> HQ
+    IF2 --> FFQ
+    IF3 --> IVQ
+    IF4 --> FHQ
+
+    BF --> AGG["Aggregate\nresults + time_ms\nper method"]
+    HQ --> AGG
+    FFQ --> AGG
+    IVQ --> AGG
+    FHQ --> AGG
+    AGG -->|"JSON — all 5 methods\nbenchmark table"| BRW
+  end
+    </div>
+  </div>
+
+  <div class="arch-legend">
+    <div class="legend-card">
+      <div class="lc-title">SQLite  (songs.db)</div>
+      <div class="lc-body">Stores song metadata (title, artist, filename) and each embedding as a numpy blob. Only brute-force reads this at query time — the ANN engines use their own index files.</div>
+    </div>
+    <div class="legend-card">
+      <div class="lc-title">128-dim unit vector</div>
+      <div class="lc-body">128 MFCC coefficients averaged over time, then L2-normalised. L2-normalisation means cosine similarity = dot product, which is what all five engines compute.</div>
+    </div>
+    <div class="legend-card">
+      <div class="lc-title">Brute Force  O(n)</div>
+      <div class="lc-body">One dot product per song. Scales linearly — double the library, double the time. The ground-truth baseline everything else is measured against.</div>
+    </div>
+    <div class="legend-card">
+      <div class="lc-title">hnswlib HNSW  O(log n)</div>
+      <div class="lc-body">Reference implementation by the algorithm's original authors. Builds a layered graph; queries greedily descend from the sparse top layer to the dense bottom layer.</div>
+    </div>
+    <div class="legend-card">
+      <div class="lc-title">FAISS Flat  O(n)</div>
+      <div class="lc-body">Same O(n) as brute force but uses AVX2/AVX-512 SIMD to compute many dot products per CPU cycle. Often faster than numpy despite identical complexity.</div>
+    </div>
+    <div class="legend-card">
+      <div class="lc-title">FAISS IVF  O(√n)</div>
+      <div class="lc-body">Clusters all vectors into sqrt(n) Voronoi cells with k-means. At query time only nprobe=25% of cells are searched — the rest are skipped entirely.</div>
+    </div>
+    <div class="legend-card">
+      <div class="lc-title">FAISS HNSW  O(log n)</div>
+      <div class="lc-body">Same HNSW algorithm as hnswlib but with FAISS's SIMD distance kernels and memory layout. Faster at large scale; same accuracy trade-offs.</div>
+    </div>
+    <div class="legend-card">
+      <div class="lc-title">Index files  (data/indices/)</div>
+      <div class="lc-body">Written once at ingest time, memory-mapped at query time. Rebuilding indices (e.g. after adding songs) doesn't touch the database, and vice versa.</div>
+    </div>
+  </div>
+
+</div><!-- /tab-architecture -->
+
+</main>
+
+<script>
+let selectedFile = null;
+let currentQueryId = null;
+let songMap = {};  // "Artist — Title" -> song id
+
+// Drag-and-drop
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) setFile(f);
+});
+
+function onFileSelected(input) {
+  if (input.files[0]) setFile(input.files[0]);
+}
+
+function setFile(f) {
+  selectedFile = f;
+  document.getElementById('filename').textContent = f.name + '  (' + (f.size / 1024).toFixed(1) + ' KB)';
+  document.getElementById('searchBtn').disabled = false;
+}
+
+async function doSearch() {
+  if (!selectedFile) return;
+  const btn = document.getElementById('searchBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  document.getElementById('results').innerHTML = '';
+
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+
+  try {
+    const resp = await fetch('/search', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (!resp.ok) { showError(data.detail || JSON.stringify(data)); return; }
+    renderResults(data);
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Find Song';
+  }
+}
+
+function showError(msg) {
+  document.getElementById('results').innerHTML = `<div class="error-box">${msg}</div>`;
+}
+
+function renderResults(data) {
+  currentQueryId = data.query_id;
+  const n = data.n_songs;
+
+  // Best match from brute_force (ground truth)
+  const gt = data.brute_force.results[0];
+
+  // Methods in display order
+  const methods = [
+    { key: 'brute_force', label: 'Brute Force (numpy)', type: 'exact' },
+    { key: 'hnswlib',     label: 'hnswlib HNSW',        type: 'approx' },
+    { key: 'faiss_flat',  label: 'FAISS Flat',          type: 'exact' },
+    { key: 'faiss_ivf',   label: 'FAISS IVF',           type: 'approx' },
+    { key: 'faiss_hnsw',  label: 'FAISS HNSW',          type: 'approx' },
+    { key: 'dtw',         label: 'DTW (pitch contour)',  type: 'sequence' },
+  ];
+
+  const maxTime = Math.max(...methods.map(m => data[m.key]?.time_ms || 0));
+  const baseTime = data.brute_force.time_ms;  // 1x baseline = O(n) brute force
+
+  function fmtTime(ms) {
+    if (ms < 1) return (ms * 1000).toFixed(1) + ' µs';
+    return ms.toFixed(2) + ' ms';
+  }
+
+  function fmtMultiple(ms) {
+    if (ms === baseTime) return '<span style="color:var(--muted);font-size:0.75rem">1x (baseline)</span>';
+    const ratio = ms / baseTime;
+    if (ratio < 1) {
+      return `<span style="color:var(--green);font-weight:600">${(1/ratio).toFixed(1)}x faster</span>`;
+    }
+    return `<span style="color:var(--accent2);font-weight:600">${ratio.toFixed(1)}x slower</span>`;
+  }
+
+  // --- Timing comparison ---
+  let tableRows = methods.map(m => {
+    const d = data[m.key];
+    if (!d) return '';
+    const top1 = d.results[0];
+    const agreed = top1 && gt && top1.title === gt.title;
+    const barW = maxTime > 0 ? (d.time_ms / maxTime * 100).toFixed(1) : 0;
+    return `
+      <tr>
+        <td>${m.label} <span class="badge ${m.type}">${m.type}</span></td>
+        <td style="font-variant-numeric:tabular-nums;color:var(--text)">${fmtTime(d.time_ms)}</td>
+        <td>${fmtMultiple(d.time_ms)}</td>
+        <td class="bar-cell"><div class="bar-bg"><div class="bar-fill" style="width:${barW}%"></div></div></td>
+        <td style="color:${agreed || m.type==='exact' ? 'var(--green)' : 'var(--red)'};font-size:0.78rem">${m.type === 'exact' ? '—' : (agreed ? '✓ agreed' : '✗ missed')}</td>
+        <td style="color:var(--muted);font-size:0.78rem">${top1 ? top1.title : '—'}</td>
+      </tr>`;
+  }).join('');
+
+  // --- Match cards (best method = brute force) ---
+  const matchCards = data.brute_force.results.map(r => `
+    <div class="match-row">
+      <span class="rank">#${r.rank}</span>
+      <div class="song-info">
+        <div class="song-title">${r.title}</div>
+        <div class="song-artist">${r.artist}</div>
+      </div>
+      <span class="score-val">${r.score.toFixed(4)}</span>
+    </div>`).join('');
+
+  document.getElementById('results').innerHTML = `
+    <div class="results-header">Benchmark — ${n} songs in library</div>
+    <table class="timing-table">
+      <thead><tr>
+        <th>Method</th><th>Time taken</th><th>vs brute force</th><th>Bar</th><th>Recall</th><th>Top match</th>
+      </tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+
+    <div class="method-block">
+      <div class="method-title">Best matches (brute force — ground truth)</div>
+      <div class="match-list">${matchCards}</div>
+    </div>
+
+    <div class="feedback-box" id="feedbackBox">
+      <div class="fb-q">Was the top match correct?</div>
+      <div class="fb-btns">
+        <button class="fb-btn yes" onclick="feedbackYes()">Yes ✓</button>
+        <button class="fb-btn" onclick="feedbackNo()">No, it was a different song</button>
+      </div>
+      <div class="fb-form" id="fbForm" style="display:none">
+        <label>Select the correct song:</label>
+        <input class="fb-input" id="fbInput" list="fbSongList" placeholder="Type title or artist…" oninput="filterFbList(this.value)">
+        <datalist id="fbSongList"></datalist>
+        <button class="fb-submit" onclick="submitFeedback()">Save &amp; remember</button>
+      </div>
+      <div class="fb-ok" id="fbOk" style="display:none"></div>
+    </div>
+  `;
+  buildFbList();
+}
+
+function buildFbList() {
+  const dl = document.getElementById('fbSongList');
+  if (!dl) return;
+  dl.innerHTML = Object.keys(songMap).map(k => `<option value="${k}">`).join('');
+}
+
+function feedbackYes() {
+  document.getElementById('feedbackBox').innerHTML =
+    '<span style="color:var(--green);font-size:0.85rem">✓ Great, match confirmed!</span>';
+}
+
+function feedbackNo() {
+  document.getElementById('fbForm').style.display = 'flex';
+}
+
+async function submitFeedback() {
+  const val = document.getElementById('fbInput').value.trim();
+  const songId = songMap[val];
+  if (!songId) {
+    document.getElementById('fbInput').style.borderColor = 'var(--red)';
+    return;
+  }
+  if (!currentQueryId) {
+    document.getElementById('fbOk').textContent = 'Session expired — please search again.';
+    document.getElementById('fbOk').style.display = 'block';
+    return;
+  }
+  const resp = await fetch('/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query_id: currentQueryId, song_id: songId }),
+  });
+  const d = await resp.json();
+  if (resp.ok) {
+    document.getElementById('fbForm').style.display = 'none';
+    const ok = document.getElementById('fbOk');
+    ok.textContent = `✓ Saved! Brute force will use this hum as an example for "${val}" next time. (${d.feedback_total} total feedback entries)`;
+    ok.style.display = 'block';
+    currentQueryId = null;
+  } else {
+    document.getElementById('fbOk').textContent = d.detail || 'Error saving feedback.';
+    document.getElementById('fbOk').style.display = 'block';
+  }
+}
+
+// Load status + songs on page load
+async function loadStatus() {
+  const s = await fetch('/status').then(r => r.json()).catch(() => null);
+  if (!s) return;
+  const dot = ok => `<span class="dot ${ok ? 'green' : 'red'}"></span>`;
+  document.getElementById('statusSongs').innerHTML = dot(s.songs_indexed > 0) + `${s.songs_indexed} songs`;
+  document.getElementById('statusHnsw').innerHTML = dot(s.hnswlib_ready) + 'hnswlib';
+  document.getElementById('statusFaiss').innerHTML = dot(s.faiss_ready) + 'FAISS';
+}
+
+async function loadSongs() {
+  const songs = await fetch('/songs').then(r => r.json()).catch(() => []);
+  // Build songMap for feedback typeahead: "Artist — Title" -> id
+  songMap = {};
+  songs.forEach(s => { songMap[`${s.artist} — ${s.title}`] = s.id; });
+
+  const grid = document.getElementById('songGrid');
+  if (!songs.length) {
+    grid.innerHTML = '<em style="color:var(--muted);font-size:0.8rem">No songs indexed. Run scripts/ingest.py</em>';
+    return;
+  }
+  grid.innerHTML = songs.map(s => `
+    <div class="song-card">
+      <div class="t">${s.title}</div>
+      <div class="a">${s.artist}</div>
+    </div>`).join('');
+}
+
+loadStatus();
+loadSongs();
+
+// Tab switching
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    if (b.textContent.toLowerCase().startsWith(name === 'search' ? 'search' : 'arch')) {
+      b.classList.add('active');
+    }
+  });
+  // Render Mermaid lazily on first open
+  if (name === 'architecture' && !window._mermaidReady) {
+    window._mermaidReady = true;
+    mermaid.initialize({ startOnLoad: false });
+    mermaid.run({ querySelector: '.mermaid' });
+  }
+}
+</script>
+</body>
+</html>
