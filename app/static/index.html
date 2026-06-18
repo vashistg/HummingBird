@@ -135,19 +135,6 @@
   }
   .highlight { color: var(--accent2); }
 
-  /* Song list */
-  .song-list-section { margin-top: 2rem; }
-  .song-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 0.6rem; margin-top: 0.8rem;
-  }
-  .song-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-    padding: 0.6rem 0.9rem; font-size: 0.8rem;
-  }
-  .song-card .t { color: var(--text); }
-  .song-card .a { color: var(--muted); font-size: 0.72rem; }
-
   .spinner {
     display: inline-block; width: 14px; height: 14px;
     border: 2px solid var(--border); border-top-color: var(--accent);
@@ -262,12 +249,6 @@
 
   <!-- Results area -->
   <div id="results"></div>
-
-  <!-- Indexed songs -->
-  <div class="song-list-section">
-    <div class="results-header">Indexed library</div>
-    <div class="song-grid" id="songGrid"><em style="color:var(--muted);font-size:0.8rem">loading…</em></div>
-  </div>
 
   <!-- Explainer -->
   <details>
@@ -629,17 +610,6 @@ async function loadSongs() {
   // Build songMap for feedback typeahead: "Artist — Title" -> id
   songMap = {};
   songs.forEach(s => { songMap[`${s.artist} — ${s.title}`] = s.id; });
-
-  const grid = document.getElementById('songGrid');
-  if (!songs.length) {
-    grid.innerHTML = '<em style="color:var(--muted);font-size:0.8rem">No songs indexed. Run scripts/ingest.py</em>';
-    return;
-  }
-  grid.innerHTML = songs.map(s => `
-    <div class="song-card">
-      <div class="t">${s.title}</div>
-      <div class="a">${s.artist}</div>
-    </div>`).join('');
 }
 
 loadStatus();
