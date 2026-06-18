@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HummingBird — Mini Shazam</title>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <style>
   :root {
     --bg: #0f0f13;
@@ -198,7 +197,53 @@
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 12px; padding: 2rem; margin-top: 1.5rem; overflow-x: auto;
   }
-  .arch-wrap .mermaid { min-width: 640px; }
+  .arch-flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .arch-node {
+    background: #12121a; border: 1px solid var(--border);
+    border-radius: 10px; padding: 0.75rem 1.4rem; text-align: center;
+    min-width: 200px; max-width: 340px;
+  }
+  .arch-node.type-client { border-color: var(--accent); }
+  .arch-node.type-server { border-color: var(--accent2); }
+  .arch-node.type-process { border-color: var(--yellow); }
+  .arch-node.type-data { border-color: var(--green); }
+  .arch-node.type-exact { border-color: var(--accent); }
+  .arch-node.type-approx { border-color: #a070ff; }
+  .arch-node-title { font-size: 0.88rem; color: var(--text); margin-bottom: 0.2rem; font-weight: 600; }
+  .arch-node-sub { font-size: 0.74rem; color: var(--muted); line-height: 1.4; }
+  .arch-node-badge { font-size: 0.69rem; margin: 0.25rem 0 0; display: inline-block; }
+  .arch-vconn {
+    display: flex; flex-direction: column; align-items: center;
+    color: var(--muted); font-size: 0.72rem; padding: 0; gap: 0;
+  }
+  .arch-vconn::before {
+    content: ''; display: block; width: 1px; height: 16px;
+    background: var(--border); margin-bottom: 2px;
+  }
+  .arch-vconn-label { margin-bottom: 2px; }
+  .arch-vconn::after {
+    content: '▼'; font-size: 0.5rem; color: var(--accent); margin-bottom: 2px;
+  }
+  .arch-search-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; max-width: 720px;
+  }
+  .arch-search-row .arch-node { min-width: 118px; max-width: 140px; padding: 0.6rem 0.8rem; }
+  .arch-data-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; max-width: 500px;
+  }
+  .arch-section-label {
+    font-size: 0.69rem; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); margin-bottom: 0.6rem; text-align: center;
+  }
+  .arch-ingest-box {
+    border: 1px dashed var(--border); border-radius: 10px;
+    padding: 1rem 1.4rem; margin-bottom: 1.5rem; width: 100%;
+  }
+  .arch-ingest-row {
+    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; justify-content: center;
+  }
+  .arch-ingest-row .arch-node { min-width: 100px; max-width: 160px; padding: 0.5rem 0.8rem; }
+  .arch-hconn { color: var(--accent); font-size: 1.1rem; flex-shrink: 0; }
   .arch-legend {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 0.8rem; margin-top: 1.5rem;
@@ -305,60 +350,101 @@ Both:       M=connections per node, ef_construction=build quality, ef=query qual
   <div class="arch-wrap">
     <div class="results-header" style="margin-bottom:1.2rem">System Architecture</div>
 
-    <div class="mermaid">
-%%{init: {"theme": "dark", "themeVariables": {
-  "background": "#0f0f13",
-  "primaryColor": "#1a1a22",
-  "primaryTextColor": "#e0e0f0",
-  "primaryBorderColor": "#7c6aff",
-  "lineColor": "#7c6aff",
-  "secondaryColor": "#12121a",
-  "tertiaryColor": "#12121a",
-  "clusterBkg": "#12121a",
-  "clusterBorder": "#2a2a36",
-  "edgeLabelBackground": "#1a1a22",
-  "fontFamily": "SF Mono, Fira Code, monospace"
-}}}%%
-flowchart TB
+    <div class="arch-flow">
 
-  subgraph INGEST["📥  Ingest Pipeline  —  scripts/ingest.py  (run once offline)"]
-    direction LR
-    AF["🎵 Audio Files\ndata/songs/\n.wav  .mp3  .flac"] --> LIB1["librosa\nMFCC extractor\nn_mfcc = 128"]
-    LIB1 -->|"mean over time\nL2-normalise"| EMB["128-dim\nunit vector\nfloat32"]
-    EMB -->|"metadata +\nembedding blob"| DB[("SQLite\nsongs.db")]
-    EMB --> HB["hnswlib\nbuilder\nM=16  ef=200"]
-    EMB --> FB["FAISS\nbuilder"]
-    HB --> IF1["hnswlib.bin\nlayered graph"]
-    FB --> IF2["faiss_flat.index\nexact · SIMD"]
-    FB --> IF3["faiss_ivf.index\nVoronoi clusters"]
-    FB --> IF4["faiss_hnsw.index\nlayered graph"]
-  end
+      <!-- Ingest pipeline (offline) -->
+      <div class="arch-ingest-box">
+        <div class="arch-section-label">Ingest Pipeline — scripts/ingest.py (run once, offline)</div>
+        <div class="arch-ingest-row">
+          <div class="arch-node">
+            <div class="arch-node-title">🎵 Audio Files</div>
+            <div class="arch-node-sub">data/songs/</div>
+          </div>
+          <div class="arch-hconn">→</div>
+          <div class="arch-node type-process">
+            <div class="arch-node-title">librosa MFCC</div>
+            <div class="arch-node-sub">128-dim unit vector</div>
+          </div>
+          <div class="arch-hconn">→</div>
+          <div class="arch-node type-data">
+            <div class="arch-node-title">SQLite · songs.db</div>
+            <div class="arch-node-sub">metadata + embeddings</div>
+          </div>
+          <div class="arch-hconn">+</div>
+          <div class="arch-node type-data">
+            <div class="arch-node-title">Index Files</div>
+            <div class="arch-node-sub">hnswlib.bin · faiss_*.index</div>
+          </div>
+        </div>
+      </div>
 
-  subgraph QUERY["🔍  Query Pipeline  —  app/main.py  (per request, real-time)"]
-    direction TB
-    BRW["🌐 Browser\nHTML + JS"] -->|"audio file upload\nmultipart/form-data"| EP["FastAPI\nPOST /search"]
-    EP --> LIB2["librosa\nMFCC extractor"]
-    LIB2 -->|"128-dim\nquery vector"| QV{" "}
+      <!-- Query pipeline -->
+      <div class="arch-section-label">Query Pipeline — app/main.py (per request, real-time)</div>
 
-    QV --> BF["① Brute Force\nnumpy  E @ q\nO(n) — ground truth"]
-    QV --> HQ["② hnswlib HNSW\ngraph walk\nO(log n)"]
-    QV --> FFQ["③ FAISS Flat\nSIMD dot products\nO(n) optimised"]
-    QV --> IVQ["④ FAISS IVF\nprobe 25% clusters\nO(sqrt n)"]
-    QV --> FHQ["⑤ FAISS HNSW\ngraph walk\nO(log n)"]
+      <div class="arch-node type-client">
+        <div class="arch-node-title">🌐 Browser</div>
+        <div class="arch-node-sub">Audio upload · result display</div>
+      </div>
 
-    DB -->|"load all\nembeddings"| BF
-    IF1 --> HQ
-    IF2 --> FFQ
-    IF3 --> IVQ
-    IF4 --> FHQ
+      <div class="arch-vconn"><span class="arch-vconn-label">HTTP POST /search (audio file)</span></div>
 
-    BF --> AGG["Aggregate\nresults + time_ms\nper method"]
-    HQ --> AGG
-    FFQ --> AGG
-    IVQ --> AGG
-    FHQ --> AGG
-    AGG -->|"JSON — all 5 methods\nbenchmark table"| BRW
-  end
+      <div class="arch-node type-server">
+        <div class="arch-node-title">FastAPI Server</div>
+        <div class="arch-node-sub">app/main.py</div>
+      </div>
+
+      <div class="arch-vconn"><span class="arch-vconn-label">extract audio features</span></div>
+
+      <div class="arch-node type-process">
+        <div class="arch-node-title">librosa MFCC Extractor</div>
+        <div class="arch-node-sub">128-dim unit vector · float32</div>
+      </div>
+
+      <div class="arch-vconn"><span class="arch-vconn-label">5 methods race in parallel</span></div>
+
+      <div class="arch-search-row">
+        <div class="arch-node type-exact">
+          <div class="arch-node-title">Brute Force</div>
+          <div class="arch-node-badge badge-exact">exact · O(n)</div>
+        </div>
+        <div class="arch-node type-approx">
+          <div class="arch-node-title">hnswlib HNSW</div>
+          <div class="arch-node-badge badge-approx">approx · O(log n)</div>
+        </div>
+        <div class="arch-node type-exact">
+          <div class="arch-node-title">FAISS Flat</div>
+          <div class="arch-node-badge badge-exact">exact · O(n)</div>
+        </div>
+        <div class="arch-node type-approx">
+          <div class="arch-node-title">FAISS IVF</div>
+          <div class="arch-node-badge badge-approx">approx · O(√n)</div>
+        </div>
+        <div class="arch-node type-approx">
+          <div class="arch-node-title">FAISS HNSW</div>
+          <div class="arch-node-badge badge-approx">approx · O(log n)</div>
+        </div>
+      </div>
+
+      <div class="arch-vconn"><span class="arch-vconn-label">reads from data stores (loaded at startup)</span></div>
+
+      <div class="arch-data-row">
+        <div class="arch-node type-data">
+          <div class="arch-node-title">SQLite · songs.db</div>
+          <div class="arch-node-sub">embeddings for brute force</div>
+        </div>
+        <div class="arch-node type-data">
+          <div class="arch-node-title">Index Files</div>
+          <div class="arch-node-sub">hnswlib.bin · faiss_*.index</div>
+        </div>
+      </div>
+
+      <div class="arch-vconn"><span class="arch-vconn-label">JSON response · benchmark timings</span></div>
+
+      <div class="arch-node type-client">
+        <div class="arch-node-title">🌐 Browser · Results</div>
+        <div class="arch-node-sub">Timing table · top-k match cards</div>
+      </div>
+
     </div>
   </div>
 
@@ -625,12 +711,6 @@ function switchTab(name) {
       b.classList.add('active');
     }
   });
-  // Render Mermaid lazily on first open
-  if (name === 'architecture' && !window._mermaidReady) {
-    window._mermaidReady = true;
-    mermaid.initialize({ startOnLoad: false });
-    mermaid.run({ querySelector: '.mermaid' });
-  }
 }
 </script>
 </body>
