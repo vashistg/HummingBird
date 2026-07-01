@@ -431,62 +431,6 @@
     font-size: 0.85rem;
   }
 
-  /* ── Feedback ────────────────────────────────────── */
-  .feedback-box {
-    margin-top: 1.2rem;
-    background: var(--bg-elevated);
-    border: 0.5px solid var(--separator);
-    border-radius: var(--radius);
-    padding: 1.1rem 1.3rem;
-    font-size: 0.85rem;
-    box-shadow: var(--shadow-sm);
-  }
-  .feedback-box .fb-q { color: var(--text2); margin-bottom: 0.8rem; font-size: 0.88rem; }
-  .fb-btns { display: flex; gap: 0.6rem; flex-wrap: wrap; }
-  .fb-btn {
-    background: var(--fill);
-    border: 0.5px solid var(--separator);
-    border-radius: 980px;
-    color: var(--text);
-    padding: 0.35rem 1.1rem;
-    font-family: inherit;
-    font-size: 0.82rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .fb-btn:hover     { border-color: var(--accent); color: var(--accent); background: rgba(10,132,255,0.1); }
-  .fb-btn.yes:hover { border-color: var(--green);  color: var(--green);  background: rgba(48,209,88,0.1); }
-  .fb-form  { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.7rem; }
-  .fb-form label { color: var(--text2); font-size: 0.8rem; }
-  .fb-input {
-    background: var(--bg-secondary);
-    border: 0.5px solid var(--sep-opaque);
-    border-radius: 8px;
-    color: var(--text);
-    padding: 0.5rem 0.9rem;
-    font-family: inherit;
-    font-size: 0.85rem;
-    width: 100%;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .fb-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(10,132,255,0.2); }
-  .fb-submit {
-    align-self: flex-start;
-    background: var(--accent);
-    border: none;
-    border-radius: 980px;
-    color: #fff;
-    padding: 0.45rem 1.2rem;
-    font-family: inherit;
-    font-size: 0.82rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  .fb-submit:hover { background: #0070E0; }
-  .fb-ok { color: var(--green); font-size: 0.82rem; margin-top: 0.5rem; }
-
   /* ── Architecture tab ────────────────────────────── */
   .arch-wrap {
     background: var(--bg-elevated);
@@ -849,8 +793,6 @@ Both:       M=connections per node, ef_construction=build quality, ef=query qual
 
 <script>
 let selectedFile = null;
-let currentQueryId = null;
-let songMap = {};  // "Artist — Title" -> song id
 
 // Drag-and-drop
 const dropZone = document.getElementById('dropZone');
@@ -902,7 +844,6 @@ function showError(msg) {
 }
 
 function renderResults(data) {
-  currentQueryId = data.query_id;
   const n = data.n_songs;
 
   // Best match from brute_force (ground truth)
@@ -977,71 +918,10 @@ function renderResults(data) {
       <div class="method-title">Best matches (brute force — ground truth)</div>
       <div class="match-list">${matchCards}</div>
     </div>
-
-    <div class="feedback-box" id="feedbackBox">
-      <div class="fb-q">Was the top match correct?</div>
-      <div class="fb-btns">
-        <button class="fb-btn yes" onclick="feedbackYes()">Yes ✓</button>
-        <button class="fb-btn" onclick="feedbackNo()">No, it was a different song</button>
-      </div>
-      <div class="fb-form" id="fbForm" style="display:none">
-        <label>Select the correct song:</label>
-        <input class="fb-input" id="fbInput" list="fbSongList" placeholder="Type title or artist…" oninput="filterFbList(this.value)">
-        <datalist id="fbSongList"></datalist>
-        <button class="fb-submit" onclick="submitFeedback()">Save &amp; remember</button>
-      </div>
-      <div class="fb-ok" id="fbOk" style="display:none"></div>
-    </div>
   `;
-  buildFbList();
 }
 
-function buildFbList() {
-  const dl = document.getElementById('fbSongList');
-  if (!dl) return;
-  dl.innerHTML = Object.keys(songMap).map(k => `<option value="${k}">`).join('');
-}
-
-function feedbackYes() {
-  document.getElementById('feedbackBox').innerHTML =
-    '<span style="color:var(--green);font-size:0.85rem">✓ Great, match confirmed!</span>';
-}
-
-function feedbackNo() {
-  document.getElementById('fbForm').style.display = 'flex';
-}
-
-async function submitFeedback() {
-  const val = document.getElementById('fbInput').value.trim();
-  const songId = songMap[val];
-  if (!songId) {
-    document.getElementById('fbInput').style.borderColor = 'var(--red)';
-    return;
-  }
-  if (!currentQueryId) {
-    document.getElementById('fbOk').textContent = 'Session expired — please search again.';
-    document.getElementById('fbOk').style.display = 'block';
-    return;
-  }
-  const resp = await fetch('/feedback', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query_id: currentQueryId, song_id: songId }),
-  });
-  const d = await resp.json();
-  if (resp.ok) {
-    document.getElementById('fbForm').style.display = 'none';
-    const ok = document.getElementById('fbOk');
-    ok.textContent = `✓ Saved! Brute force will use this hum as an example for "${val}" next time. (${d.feedback_total} total feedback entries)`;
-    ok.style.display = 'block';
-    currentQueryId = null;
-  } else {
-    document.getElementById('fbOk').textContent = d.detail || 'Error saving feedback.';
-    document.getElementById('fbOk').style.display = 'block';
-  }
-}
-
-// Load status + songs on page load
+// Load status on page load
 async function loadStatus() {
   const s = await fetch('/status').then(r => r.json()).catch(() => null);
   if (!s) return;
@@ -1051,15 +931,7 @@ async function loadStatus() {
   document.getElementById('statusFaiss').innerHTML = dot(s.faiss_ready)   + 'FAISS';
 }
 
-async function loadSongs() {
-  const songs = await fetch('/songs').then(r => r.json()).catch(() => []);
-  // Build songMap for feedback typeahead: "Artist — Title" -> id
-  songMap = {};
-  songs.forEach(s => { songMap[`${s.artist} — ${s.title}`] = s.id; });
-}
-
 loadStatus();
-loadSongs();
 
 // Tab switching
 function switchTab(name) {
